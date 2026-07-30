@@ -57,7 +57,15 @@ def detect_host() -> str:
     prefix = os.environ.get("PREFIX", "")
     if "com.termux" in prefix:
         return "termux"
-    if Path("/etc/debian_version").exists() and Path("/proc/1/root").exists():
+
+    # Safely check if /proc/1/root exists to avoid PermissionError in sandboxed environments
+    proc_1_root_exists = False
+    try:
+        proc_1_root_exists = Path("/proc/1/root").exists()
+    except OSError:
+        pass
+
+    if Path("/etc/debian_version").exists() and proc_1_root_exists:
         # proot-distro distros tend to mount root weirdly; cheap heuristic
         if "proot" in os.environ.get("PROOT_TMP_DIR", "") or os.path.exists("/proc/self/root/.l2s"):
             return "debian-proot"
