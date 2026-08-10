@@ -1108,6 +1108,7 @@ def cmd_default(args: argparse.Namespace) -> int:
     term.out(f"  {term.cyan('bubble doctor'):<48}  {term.dim('diagnose environment')}")
     term.out(f"  {term.cyan('bubble preflight <script.py>'):<48}  {term.dim('offline-readiness check')}")
     term.out(f"  {term.cyan('bubble shell create <name>'):<48}  {term.dim('long-lived bubble')}")
+    term.out(f"  {term.cyan('bubble shell enter <name>'):<48}  {term.dim('spawn isolated interactive shell')}")
     term.out(f"  {term.cyan('bubble probe / host'):<48}  {term.dim('machine self-portrait')}")
     term.out()
     term.out(f"  {term.dim('flags:')}  "
