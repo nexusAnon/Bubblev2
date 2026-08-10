@@ -2,23 +2,23 @@
 
 Each entry below is an architectural claim that was tested by running real code against the actual `bubble` package on this machine. The tests are also exhibits — read them to learn what the system does.
 
-_Run: 2026-08-09T14:51:14 — 43 passed, 0 failed, 0 skipped._
+_Run: 2026-08-10T01:34:16 — 44 passed, 0 failed, 0 skipped._
 
 ---
 
 ## ✓ a fresh BUBBLE_HOME yields a usable vault DB on schema v2
 
-`00_sanity/test_vault_initializes.py` — 46 ms
+`00_sanity/test_vault_initializes.py` — 53 ms
 
 ```
-vault_db: /tmp/bubble-test-7h6vh7ab/vault.db
+vault_db: /tmp/bubble-test-snn_dg8j/vault.db
 tables: 14 (bubbles, dependencies, module_imports, modules, packages, schema_meta, shells, top_level, universal_binaries, universal_dependencies, universal_files, universal_package_files, universal_packages, vault_files)
 packages PK: ['name', 'version', 'wheel_tag']
 ```
 
 ## ✓ bubble.AgentVault is a consumption-shape embedding API: agent runtimes can vault, register tools by alias with declarable isolation, and import them as modules — diamond-conflict dissolution surfaced as one library instead of as a CLI
 
-`10_breakers/test_agent_vault_embedding.py` — 151 ms
+`10_breakers/test_agent_vault_embedding.py` — 149 ms
 
 ```
 AgentVault() constructs into BUBBLE_HOME, vault empty
@@ -28,12 +28,12 @@ second alias 'greeter_new' bound to v2.0.0; both surfaces live concurrently from
 v1 alias unchanged after v2 alias registered — diamond conflict dissolved through the embedding API
 registered_tools(): ['greeter', 'greeter_new']
 close() removes registered aliases from sys.modules and drops the meta-finder
-AgentVault(home=av-second-home-q7_8v_nv) created separate vault root with its own SQLite index
+AgentVault(home=av-second-home-5pyitzxd) created separate vault root with its own SQLite index
 ```
 
 ## ✓ bridge orchestrates main + legacy runtimes while preserving strict defaults and hardening
 
-`10_breakers/test_bridge_routes_and_hardens.py` — 13 ms
+`10_breakers/test_bridge_routes_and_hardens.py` — 12 ms
 
 ```
 .py routes to main bubble run with isolation by default
@@ -43,10 +43,10 @@ bridge runs with reduced, hardened environment
 
 ## ✓ bundle → unbundle is the deployment surface: source manifest in, tar.gz out, target vault.db rebuilt from source's recorded facts, alias substrate field preserved, integrity edge survives the wire (post-extract tampering caught by verify against source's sha256)
 
-`10_breakers/test_bundle_round_trip.py` — 190 ms
+`10_breakers/test_bundle_round_trip.py` — 197 ms
 
 ```
-bundled: 2 packages, 15 files, 2033 bytes
+bundled: 2 packages, 15 files, 2161 bytes
 tar layout: manifest + vault subtree + shell tree (22 entries)
 unbundled into fresh home: 2 packages, integrity clean
 target db: packages=2, vault_files=8, shells=1
@@ -58,7 +58,7 @@ post-extract tampering caught by target verify (integrity edge survives transpor
 
 ## ✓ the canonical name returned by the index is cross-validated against the requested name (PEP 503 normalized) — a swap refuses before download, so the vault never holds bytes under a name the operator didn't request
 
-`10_breakers/test_canonical_name_validated.py` — 609 ms
+`10_breakers/test_canonical_name_validated.py` — 615 ms
 
 ```
 name swap refused before any download
@@ -67,7 +67,7 @@ name swap refused before any download
 
 ## ✓ bubble.tools.diff exposes compare / fuzz / bisect as the differential-evaluation verb over AgentVault — the substrate's multi-version coexistence becomes an answer to 'what changed?' without any consumer needing to rebuild the alias machinery
 
-`10_breakers/test_diff_primitive.py` — 123 ms
+`10_breakers/test_diff_primitive.py` — 130 ms
 
 ```
 compare(v0, v2): v0=('ok', 'small') v2=('ok', 'compact') identical=False
@@ -81,7 +81,7 @@ alias-name redaction: identical AttributeError across 3 aliases fingerprints as 
 
 ## ✓ vault drift refuses the lookup at the meta-finder AND surfaces a [[failures]] entry of kind vault_drift_modified in host.toml — the first place the closed loop is load-bearing rather than decorative; cached per-process so repeat lookups don't double-record
 
-`10_breakers/test_drift_refuses_and_records.py` — 85 ms
+`10_breakers/test_drift_refuses_and_records.py` — 103 ms
 
 ```
 clean verify: 4 matched, 0 drifted, 0 missing
@@ -93,7 +93,7 @@ per-process cache prevents re-recording on repeat lookup
 
 ## ✓ a stdlib-only run with autofetch on leaves the vault empty
 
-`10_breakers/test_empty_script_fetches_nothing.py` — 66 ms
+`10_breakers/test_empty_script_fetches_nothing.py` — 60 ms
 
 ```
 stdlib imports: 10
@@ -104,7 +104,7 @@ wheels/ entries:    0
 
 ## ✓ fetcher refuses non-allowlisted download URLs (off-host, http, file://) before any network work — a poisoned simple-API response can't redirect us
 
-`10_breakers/test_fetcher_refuses_off_host_url.py` — 66 ms
+`10_breakers/test_fetcher_refuses_off_host_url.py` — 59 ms
 
 ```
 http://files.pythonhosted.org/...           → rejected
@@ -116,11 +116,11 @@ https://files.pythonhosted.org/...          → admitted
 
 ## ✓ aliases resolve flat single-file modules (e.g. six.py), not only package-directory layouts — two versions of a flat dist coexist as distinct module objects in one process
 
-`10_breakers/test_flat_module_alias.py` — 82 ms
+`10_breakers/test_flat_module_alias.py` — 85 ms
 
 ```
-flatmod_old.__file__: /tmp/bubble-test-0y9cdock/vault/flatmod/1.0.0/py3-none-any/flatmod.py
-flatmod_new.__file__: /tmp/bubble-test-0y9cdock/vault/flatmod/2.0.0/py3-none-any/flatmod.py
+flatmod_old.__file__: /tmp/bubble-test-tc7ewzo_/vault/flatmod/1.0.0/py3-none-any/flatmod.py
+flatmod_new.__file__: /tmp/bubble-test-tc7ewzo_/vault/flatmod/2.0.0/py3-none-any/flatmod.py
 flatmod_old.where(): 'v1'
 flatmod_new.where(): 'v2'
 → flat single-file dists alias as cleanly as packages
@@ -128,7 +128,7 @@ flatmod_new.where(): 'v2'
 
 ## ✓ BUBBLE_PYPI_INDEX must be https; http / file / ftp / etc. are refused at fetch time — per-file sha256 only authenticates a channel we already trust, and TLS is the only thing making the index responses themselves trustworthy
 
-`10_breakers/test_https_index_required.py` — 60 ms
+`10_breakers/test_https_index_required.py` — 67 ms
 
 ```
 http   refused: refusing non-https index URL: 'http://pypi.org/simple' (BUBBLE_PYPI_INDEX must u
@@ -138,7 +138,7 @@ file   refused: refusing non-https index URL: 'file:///tmp/index' (BUBBLE_PYPI_I
 
 ## ✓ vault import-venv refuses symlinked RECORD entries: the bytes a content-addressed vault serves under a name must come from the file the dist's RECORD names, not from wherever a symlink chain happens to terminate
 
-`10_breakers/test_importer_refuses_symlinks.py` — 70 ms
+`10_breakers/test_importer_refuses_symlinks.py` — 77 ms
 
 ```
 vault contents under evil/: ['__init__.py']
@@ -148,21 +148,21 @@ symlink target's bytes never reached the vault
 
 ## ✓ a late-arriving alias does not retroactively corrupt earlier imports — Bubble's isolation is temporal, not just spatial
 
-`10_breakers/test_late_alias_does_not_corrupt_earlier.py` — 84 ms
+`10_breakers/test_late_alias_does_not_corrupt_earlier.py` — 89 ms
 
 ```
 t0: widget_old.VERSION=1.0.0, hello='v1 says hi', calls=1
 t1: widget_new arrives. VERSION=2.0.0, hello='v2 says hi'
 t2: re-using widget_old. VERSION=1.0.0, hello='v1 says hi', calls=2
-module id stable:  0x7f4cdbde23e0 → 0x7f4cdbde23e0
-class id stable:   0x55add5fb1b60 → 0x55add5fb1b60
-STATE dicts distinct: old@0x7f4cdbdea680 vs new@0x7f4cdbdeaf80
+module id stable:  0x7f39e26723e0 → 0x7f39e26723e0
+class id stable:   0x55d1b0168b60 → 0x55d1b0168b60
+STATE dicts distinct: old@0x7f39e267a740 vs new@0x7f39e267b040
 → time axis: a late alias did not contaminate earlier state
 ```
 
 ## ✓ importlib.metadata queries from inside an alias resolve against that alias's vault dist-info — not the host's, not a sibling alias's; the diamond-conflict story holds for metadata-driven packages, not just hardcoded-__version__ ones
 
-`10_breakers/test_metadata_per_alias.py` — 121 ms
+`10_breakers/test_metadata_per_alias.py` — 128 ms
 
 ```
 widget_old via importlib.metadata: version='1.0.0', name='widget'
@@ -172,7 +172,7 @@ widget_new via importlib.metadata: version='2.0.0', name='widget'
 
 ## ✓ vault-add populates modules, module_imports (split into stdlib-and-own-pkg-filtered externals), and dependencies (Requires-Dist parsed) — the three tables that schema v2 declared but never wrote
 
-`10_breakers/test_modules_and_deps_indexed.py` — 67 ms
+`10_breakers/test_modules_and_deps_indexed.py` — 72 ms
 
 ```
 modules: ['gizmo', 'gizmo.helpers']
@@ -187,16 +187,16 @@ re-stage overwrites: no duplicate rows under same key
 
 ## ✓ bubble can build its own deployment artifact via bubble run
 
-`10_breakers/test_recursive_self_host.py` — 852 ms
+`10_breakers/test_recursive_self_host.py` — 936 ms
 
 ```
 build script: tools/build_pyz.py
 bubble run tools/build_pyz.py: rc=0
-produced artifact: 131078 bytes
-sidecar sha256 matches bytes: 69580b26473cc695…
+produced artifact: 131550 bytes
+sidecar sha256 matches bytes: 6321e7ddb3066b97…
 produced pyz --help responds and lists bubble subcommands
 produced pyz `vault list` returned: 'vault is empty'
-deterministic: two builds same source → identical sha256 69580b26473cc695…
+deterministic: two builds same source → identical sha256 6321e7ddb3066b97…
 ```
 
 ## ✓ vault-only is the default for bubble's runtime — every fetch is an explicit authorization (--fetch CLI flag or BUBBLE_AUTOFETCH=1). A bare `bubble run` cannot reach PyPI, no matter what the script tries to import
@@ -210,7 +210,7 @@ opt-in via BUBBLE_AUTOFETCH=1: autofetch=True at install
 
 ## ✓ sdist-only releases are refused by default — running setup.py is RCE under the user's privileges, a sovereignty break the vault exists to prevent. --allow-sdist / BUBBLE_ALLOW_SDIST=1 toggles the gate explicitly.
 
-`10_breakers/test_sdist_refused_by_default.py` — 616 ms
+`10_breakers/test_sdist_refused_by_default.py` — 626 ms
 
 ```
 default refuse: sdist blocked before any download
@@ -221,17 +221,17 @@ opt-in via BUBBLE_ALLOW_SDIST=1 changes the failure shape
 
 ## ✓ bubble shell create follows the Requires-Dist closure: pinning a single package pulls its transitive deps into the shell, because the vault's `dependencies` table already knows the graph
 
-`10_breakers/test_shell_create_follows_requires_dist.py` — 118 ms
+`10_breakers/test_shell_create_follows_requires_dist.py` — 138 ms
 
 ```
-shell at /tmp/bubble-test-u2fyzhla/shells/closuretest
+shell at /tmp/bubble-test-eic85ip8/shells/closuretest
 lib contents: ['alpha', 'alpha-1.0.0.dist-info', 'beta', 'beta-1.0.0.dist-info', 'gamma', 'gamma-1.0.0.dist-info']
 alpha + beta + gamma all linked from closure
 ```
 
 ## ✓ deployment manifest round-trips through shell.add_pinned: exact (name, version, wheel_tag) triplets become shell-state entries; alias substrate fields are preserved for C5; drift in any pin refuses the link via the C1∩C4 join
 
-`10_breakers/test_shell_create_from_manifest.py` — 117 ms
+`10_breakers/test_shell_create_from_manifest.py` — 133 ms
 
 ```
 manifest: 2 packages, 1 aliases
@@ -243,10 +243,10 @@ host.toml gained 1 failure entries; 1 of kind vault_drift_modified
 
 ## ✓ shell creation links *.dist-info dirs into lib/, so importlib.metadata.distribution() / .entry_points() inside the shell sees the same distributions the source vault has on disk — without this, entry-point-driven runtimes silently see nothing
 
-`10_breakers/test_shell_create_links_dist_info.py` — 205 ms
+`10_breakers/test_shell_create_links_dist_info.py` — 217 ms
 
 ```
-shell at /tmp/bubble-test-x4oyzy39/shells/distinfotest
+shell at /tmp/bubble-test-gta5zbkv/shells/distinfotest
 dist-info symlinked: distinfopkg-3.1.4.dist-info
 METADATA reachable: Name: distinfopkg
 importlib.metadata.distribution: distinfopkg 3.1.4
@@ -254,10 +254,10 @@ importlib.metadata.distribution: distinfopkg 3.1.4
 
 ## ✓ shell creation merges namespace-package contributions: when N>1 vault packages claim the same top-level import name, lib/<top>/ becomes a real directory of subdir-symlinks rather than a single dir-symlink that shadows all but one. Closes the diamond-conflict story for namespace-distributed packages like opentelemetry
 
-`10_breakers/test_shell_create_merges_namespace_packages.py` — 205 ms
+`10_breakers/test_shell_create_merges_namespace_packages.py` — 194 ms
 
 ```
-shell at /tmp/bubble-test-iymb686m/shells/nstest
+shell at /tmp/bubble-test-lrxbqbu1/shells/nstest
 lib/ns/ contents: ['__init__.py', 'alpha.py', 'beta.py']
 both contributions importable: alpha beta
 4-way merge stable: lib/ns/ = ['__init__.py', 'alpha.py', 'beta.py', 'shared.py']
@@ -265,7 +265,7 @@ both contributions importable: alpha beta
 
 ## ✓ shell create / add_pinned refuses pins that aren't in the vault, with shell_pkg_missing recorded to host.toml — observable at create time, not deferred to first invocation
 
-`10_breakers/test_shell_create_refuses_orphan_targets.py` — 97 ms
+`10_breakers/test_shell_create_refuses_orphan_targets.py` — 104 ms
 
 ```
 manifest after create: ['real-pkg']
@@ -285,7 +285,7 @@ beta  import_sha256: 7eef7974f5e08293d88af8537fb8f37b11d081b3c7cb35a0b1ccc817c88
 
 ## ✓ import-name collisions across distributions emit a structured contention log entry — silent accident becomes observable event
 
-`10_breakers/test_top_level_contention_logged.py` — 78 ms
+`10_breakers/test_top_level_contention_logged.py` — 82 ms
 
 ```
 first claimant:  opencv-python (no log)
@@ -298,19 +298,19 @@ incoming sha256: 66e79245b348a9ba…
 
 ## ✓ import name resolves to a different distribution name via the SQLite top_level index, with no hardcoded table
 
-`10_breakers/test_top_level_index_bridges_import_to_dist.py` — 81 ms
+`10_breakers/test_top_level_index_bridges_import_to_dist.py` — 80 ms
 
 ```
 distribution name: Carbohydrate-9000
 top-level import:  sugar
 top_level row:     ('Carbohydrate-9000', '3.0.0', 'sugar')
-resolved module:   /tmp/bubble-test-op0g7l_v/vault/Carbohydrate-9000/3.0.0/py3-none-any/sugar/__init__.py
+resolved module:   /tmp/bubble-test-a5sj1f7u/vault/Carbohydrate-9000/3.0.0/py3-none-any/sugar/__init__.py
 → no hardcoded mapping needed; the dist-info IS the mapping
 ```
 
 ## ✓ top_level.txt is verified against the staged tree — asserted-but-absent names are dropped, so no row claims bytes that don't exist
 
-`10_breakers/test_top_level_verify_mode.py` — 77 ms
+`10_breakers/test_top_level_verify_mode.py` — 61 ms
 
 ```
 top_level.txt asserted: ['real', 'ghost']
@@ -321,20 +321,30 @@ recorded in top_level: ['real']
 
 ## ✓ two versions of the same package coexist in one process via aliases, with distinct classes and asymmetric isinstance
 
-`10_breakers/test_two_versions_one_process.py` — 83 ms
+`10_breakers/test_two_versions_one_process.py` — 88 ms
 
 ```
-widget_old.Widget: id=0x555ae24942b0
-widget_new.Widget: id=0x555ae2496100
+widget_old.Widget: id=0x55d6b88502b0
+widget_new.Widget: id=0x55d6b8852100
 widget_old hello:  'I am widget v1'
 widget_new hello:  'I am widget v2'
 isinstance asymmetric: v1∈v2=False, v2∈v1=False
 → two versions, one process, distinct classes
 ```
 
+## ✓ Phase 3 universal environment operators and interactive prompt entry hooks execute with perfect correctness
+
+`10_breakers/test_universal_shell.py` — 74 ms
+
+```
+Sourced activation script verified with full universal dynamic library search paths
+exec_in dynamic environment injection verified for all 3 universal paths
+shell_enter interactive sub-shell execution verified with visual prompt customizer
+```
+
 ## ✓ Phase 2 universal v4 SQLite tables and native ELF/Mach-O parsers work with exact precision
 
-`10_breakers/test_universal_v4.py` — 52 ms
+`10_breakers/test_universal_v4.py` — 55 ms
 
 ```
 v4 universal SQLite tables verified successfully with cascade deletion
@@ -347,7 +357,7 @@ MachOParser correctly parsed mock 64-bit Mach-O LC_RPATH load command
 `10_breakers/test_vault_dir_perms.py` — 3 ms
 
 ```
-  bubble-test-5dl_p07t mode=0o700
+  bubble-test-6tqit0es mode=0o700
   vault              mode=0o700
   .staging           mode=0o700
   shells             mode=0o700
@@ -357,7 +367,7 @@ MachOParser correctly parsed mock 64-bit Mach-O LC_RPATH load command
 
 ## ✓ AgentVault.register(isolation='subprocess') drives the subprocess substrate from the embedding API: an agent declares the isolation ring per tool, the substrate ladder dispatches accordingly, and two versions of one dist coexist as differently-shaped tools — the consumption surface for diamond-conflict dissolution
 
-`30_loop/test_agent_vault_isolation.py` — 192 ms
+`30_loop/test_agent_vault_isolation.py` — 194 ms
 
 ```
 staged avi 1.0.0 + 2.0.0 in vault
@@ -372,7 +382,7 @@ close() drained the subprocess interp registry
 
 ## ✓ alias declaring substrate=dlmopen_isolated routes through the substrate handler and yields a callable proxy module: module-level constants reachable, functions invokable with primitive args, two versions of the same package serving distinct surfaces in one process — the diamond conflict dissolved at the link-namespace level
 
-`30_loop/test_dlmopen_routing_through_proxy.py` — 151 ms
+`30_loop/test_dlmopen_routing_through_proxy.py` — 161 ms
 
 ```
 two distinct module objects from one alias dict
@@ -386,12 +396,12 @@ v2-only function callable: dv2.perimeter(4,5) = 18
 
 ## ✓ dlmopen-isolated substrate is a verified capability on supporting hosts: a fresh libpython initializes in its own link namespace, a vaulted package loads inside it, and a value from the package crosses the boundary back to the caller — single-call demonstration the README named as reachable
 
-`30_loop/test_dlmopen_substrate_handler.py` — 131 ms
+`30_loop/test_dlmopen_substrate_handler.py` — 115 ms
 
 ```
 dlmopen_isolated available on this host
   status: namespace + interpreter init verified; proxy module bridge online (picklable attrs + primitive calls); object-identity-across-calls not yet plumbed
-staged islet==3.1.4 at /tmp/bubble-test-5n02a5s5/vault/islet/3.1.4/py3-none-any
+staged islet==3.1.4 at /tmp/bubble-test-yh9zhz8y/vault/islet/3.1.4/py3-none-any
 isolated interp ran a smoke instruction
 VERSION crossed the boundary: '3.1.4'
 ANSWER crossed the boundary: '42'
@@ -401,7 +411,7 @@ double(21) crossed the boundary: '42'
 
 ## ✓ runtime failures round-trip through host.toml: write via record_failure, read via known_failures, find via is_known_failure
 
-`30_loop/test_failure_recording_round_trip.py` — 28 ms
+`30_loop/test_failure_recording_round_trip.py` — 37 ms
 
 ```
 recorded 3 failures via host.record_failure
@@ -413,10 +423,10 @@ round-tripped detail: 'received SIGSEGV during dlopen'
 
 ## ✓ bubble probe writes host.toml; the host module reads it back; the substrate menu reflects machine capability
 
-`30_loop/test_probe_writes_host_toml.py` — 29 ms
+`30_loop/test_probe_writes_host_toml.py` — 26 ms
 
 ```
-probed_at: 2026-08-09T14:51:12.405744
+probed_at: 2026-08-10T01:34:14.269915
 kernel:    Linux 6.8.0 x86_64
 python:    3.12.13 (cpython)
 substrates this machine reports it can host:
@@ -429,7 +439,7 @@ substrates this machine reports it can host:
 
 ## ✓ alias declaring substrate=subprocess routes through the substrate handler and yields a callable proxy module: module-level constants reachable, functions invokable with primitive args, two versions of the same package serving distinct surfaces in one caller-process tree — diamond conflict dissolved at the OS-process level, portable everywhere Python runs
 
-`30_loop/test_subprocess_routing_through_proxy.py` — 175 ms
+`30_loop/test_subprocess_routing_through_proxy.py` — 188 ms
 
 ```
 two distinct module objects from one alias dict
@@ -443,12 +453,12 @@ v2-only function callable: dv2.perimeter(4,5) = 18
 
 ## ✓ subprocess-isolated substrate is a verified capability: a child python spawns, a vaulted package loads inside it, attribute access and primitive function calls cross the OS-process boundary via length-prefixed pickle frames — the structural hole dlmopen's portability constraints left open is closed
 
-`30_loop/test_subprocess_substrate_handler.py` — 168 ms
+`30_loop/test_subprocess_substrate_handler.py` — 164 ms
 
 ```
 subprocess substrate available on this host
   status: subprocess substrate ready: child python spawnable, pickle channel + proxy module bridge online (picklable attrs + primitive calls); object-identity-across-calls not yet plumbed
-staged islet_sub==3.1.4 at /tmp/bubble-test-gbin2wk2/vault/islet_sub/3.1.4/py3-none-any
+staged islet_sub==3.1.4 at /tmp/bubble-test-ybq428s2/vault/islet_sub/3.1.4/py3-none-any
 install_module: islet_sub imported in child
 VERSION crossed the boundary: '3.1.4'
 ANSWER crossed the boundary: 42
@@ -459,7 +469,7 @@ concat(a,b=) crossed: 'left|right'
 
 ## ✓ substrate routing closes the load-bearing loop: a first-run downgrade records to host.toml, a second-run resolution learns from history without re-probing, and no redundant entries accumulate — every run starts smarter than the last
 
-`30_loop/test_substrate_routing_learns.py` — 90 ms
+`30_loop/test_substrate_routing_learns.py` — 92 ms
 
 ```
 first run: alias resolved, bytes loaded via downgrade
@@ -471,7 +481,7 @@ second run did not double-record — load-bearing memory, not noise
 
 ## ✓ shell freeze produces a round-trippable deployment manifest
 
-`70_project/test_project_freeze.py` — 88 ms
+`70_project/test_project_freeze.py` — 115 ms
 
 ```
 manifest written: True
@@ -481,7 +491,7 @@ foxtrot==5.0.0 @py3-none-any
 
 ## ✓ project ingest creates shell and .bubble-shell marker
 
-`70_project/test_project_ingest_basic.py` — 91 ms
+`70_project/test_project_ingest_basic.py` — 105 ms
 
 ```
 scanned_files: 2
@@ -491,16 +501,16 @@ linked: [('alpha', '1.0.0', 'py3-none-any', 1)]
 
 ## ✓ spinoff shell inherits parent scope for packages it does not pin
 
-`70_project/test_project_parent_chain.py` — 127 ms
+`70_project/test_project_parent_chain.py` — 143 ms
 
 ```
-spinoff delta: ('delta', '3.0.0', 'py3-none-any', '/tmp/bubble-test-wyayve36/vault/delta/3.0.0/py3-none-any')
-spinoff echo_pkg (inherited): ('echo-pkg', '4.0.0', 'py3-none-any', '/tmp/bubble-test-wyayve36/vault/echo-pkg/4.0.0/py3-none-any')
+spinoff delta: ('delta', '3.0.0', 'py3-none-any', '/tmp/bubble-test-adddb6qd/vault/delta/3.0.0/py3-none-any')
+spinoff echo_pkg (inherited): ('echo-pkg', '4.0.0', 'py3-none-any', '/tmp/bubble-test-adddb6qd/vault/echo-pkg/4.0.0/py3-none-any')
 ```
 
 ## ✓ ingest persists package scope to shell metadata
 
-`70_project/test_project_scope_persisted.py` — 102 ms
+`70_project/test_project_scope_persisted.py` — 146 ms
 
 ```
 scope: {'bravo': ('2.0.0', 'py3-none-any')}
@@ -508,7 +518,7 @@ scope: {'bravo': ('2.0.0', 'py3-none-any')}
 
 ## ✓ BUBBLE_SHELL pins project-specific version (soft vault isolation)
 
-`70_project/test_project_soft_isolation.py` — 116 ms
+`70_project/test_project_soft_isolation.py` — 133 ms
 
 ```
 proj-a charlie: 1.0.0

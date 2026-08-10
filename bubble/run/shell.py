@@ -189,15 +189,26 @@ _ACTIVATE_TMPL = """# bubble shell activate — source this from POSIX sh / bash
 # usage: source {shell_dir}/activate
 _BUBBLE_OLD_PYTHONPATH="${{PYTHONPATH:-}}"
 _BUBBLE_OLD_PATH="$PATH"
+_BUBBLE_OLD_LD_LIBRARY_PATH="${{LD_LIBRARY_PATH:-}}"
+_BUBBLE_OLD_DYLD_LIBRARY_PATH="${{DYLD_LIBRARY_PATH:-}}"
+_BUBBLE_OLD_PKG_CONFIG_PATH="${{PKG_CONFIG_PATH:-}}"
+
 export PYTHONPATH="{shell_lib}{parent_libs}${{PYTHONPATH:+:$PYTHONPATH}}"
 export PATH="{shell_bin}:$PATH"
+export LD_LIBRARY_PATH="{shell_lib}${{LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}}"
+export DYLD_LIBRARY_PATH="{shell_lib}${{DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}}"
+export PKG_CONFIG_PATH="{shell_lib}/pkgconfig:{shell_lib}${{PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}}"
 export BUBBLE_SHELL="{name}"
 export BUBBLE_SHELL_DIR="{shell_dir}"
 
 bubble_deactivate() {{
     export PYTHONPATH="$_BUBBLE_OLD_PYTHONPATH"
     export PATH="$_BUBBLE_OLD_PATH"
+    export LD_LIBRARY_PATH="$_BUBBLE_OLD_LD_LIBRARY_PATH"
+    export DYLD_LIBRARY_PATH="$_BUBBLE_OLD_DYLD_LIBRARY_PATH"
+    export PKG_CONFIG_PATH="$_BUBBLE_OLD_PKG_CONFIG_PATH"
     unset BUBBLE_SHELL BUBBLE_SHELL_DIR _BUBBLE_OLD_PYTHONPATH _BUBBLE_OLD_PATH
+    unset _BUBBLE_OLD_LD_LIBRARY_PATH _BUBBLE_OLD_DYLD_LIBRARY_PATH _BUBBLE_OLD_PKG_CONFIG_PATH
     unset -f bubble_deactivate
 }}
 """
@@ -947,9 +958,16 @@ def exec_in(name: str, cmd: list[str]) -> int:
     if not sd.exists():
         raise FileNotFoundError(f"shell does not exist: {name}")
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(sd / "lib") + (
+    lib_path = str(sd / "lib")
+    env["PYTHONPATH"] = lib_path + (
         f":{env['PYTHONPATH']}" if env.get("PYTHONPATH") else "")
     env["PATH"] = str(sd / "bin") + ":" + env.get("PATH", "")
+    env["LD_LIBRARY_PATH"] = lib_path + (
+        f":{env['LD_LIBRARY_PATH']}" if env.get("LD_LIBRARY_PATH") else "")
+    env["DYLD_LIBRARY_PATH"] = lib_path + (
+        f":{env['DYLD_LIBRARY_PATH']}" if env.get("DYLD_LIBRARY_PATH") else "")
+    env["PKG_CONFIG_PATH"] = f"{lib_path}/pkgconfig:{lib_path}" + (
+        f":{env['PKG_CONFIG_PATH']}" if env.get("PKG_CONFIG_PATH") else "")
     env["BUBBLE_SHELL"] = name
     env["BUBBLE_SHELL_DIR"] = str(sd)
 
@@ -962,6 +980,37 @@ def exec_in(name: str, cmd: list[str]) -> int:
     conn.commit()
     conn.close()
     return subprocess.call(cmd, env=env)
+
+
+def shell_enter(name: str, shell_exe: Optional[str] = None) -> int:
+    """Spawns an interactive shell with the bubble's environment variables and prompt override loaded."""
+    sd = shell_dir(name)
+    if not sd.exists():
+        raise FileNotFoundError(f"shell does not exist: {name}")
+
+    env = os.environ.copy()
+    lib_path = str(sd / "lib")
+    env["PYTHONPATH"] = lib_path + (
+        f":{env['PYTHONPATH']}" if env.get("PYTHONPATH") else "")
+    env["PATH"] = str(sd / "bin") + ":" + env.get("PATH", "")
+    env["LD_LIBRARY_PATH"] = lib_path + (
+        f":{env['LD_LIBRARY_PATH']}" if env.get("LD_LIBRARY_PATH") else "")
+    env["DYLD_LIBRARY_PATH"] = lib_path + (
+        f":{env['DYLD_LIBRARY_PATH']}" if env.get("DYLD_LIBRARY_PATH") else "")
+    env["PKG_CONFIG_PATH"] = f"{lib_path}/pkgconfig:{lib_path}" + (
+        f":{env['PKG_CONFIG_PATH']}" if env.get("PKG_CONFIG_PATH") else "")
+    env["BUBBLE_SHELL"] = name
+    env["BUBBLE_SHELL_DIR"] = str(sd)
+
+    # Prompt customization
+    old_ps1 = env.get("PS1", "\\u@\\h:\\w\\$ ")
+    env["PS1"] = f"(bubble:{name}) {old_ps1}"
+
+    if not shell_exe:
+        shell_exe = env.get("SHELL") or shutil.which("bash") or "/bin/sh"
+
+    # Execute interactive sub-shell
+    return subprocess.call([shell_exe], env=env)
 
 
 def discover_shell_for(start: Path) -> Optional[str]:

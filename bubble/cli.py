@@ -535,6 +535,11 @@ def cmd_shell_exec(args: argparse.Namespace) -> int:
     return shell_mod.exec_in(args.name, args.cmd)
 
 
+def cmd_shell_enter(args: argparse.Namespace) -> int:
+    db.init_db()
+    return shell_mod.shell_enter(args.name)
+
+
 def cmd_host(args: argparse.Namespace) -> int:
     """bubble host — show what bubble knows about this machine.
 
@@ -1208,6 +1213,10 @@ def build_parser() -> argparse.ArgumentParser:
     se.add_argument("name")
     se.add_argument("cmd", nargs=argparse.REMAINDER)
     se.set_defaults(func=cmd_shell_exec)
+
+    sent = ssub.add_parser("enter", help="spawn an interactive shell with bubble environment loaded")
+    sent.add_argument("name")
+    sent.set_defaults(func=cmd_shell_enter)
 
     sact = ssub.add_parser("activate", help="print path to activate script")
     sact.add_argument("name")
