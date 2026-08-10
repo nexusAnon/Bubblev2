@@ -720,6 +720,57 @@ def cmd_run(args: argparse.Namespace) -> int:
     raw = args.script
     raw_path = Path(raw)
 
+    # Polyglot Compilation/Execution Dispatch
+    if raw_path.exists():
+        if raw.endswith((".c", ".cpp")):
+            from .run.builder import build_c_cpp, BuildError
+            dest_bin = config.WHEELS_DIR / raw_path.stem
+            try:
+                target = build_c_cpp(raw_path, dest_bin)
+                # Force dynamic interpreter variables to be set for the executed target
+                env = os.environ.copy()
+                env["LD_LIBRARY_PATH"] = str(config.BUBBLE_HOME / "lib") + (
+                    f":{env['LD_LIBRARY_PATH']}" if env.get("LD_LIBRARY_PATH") else "")
+                env["DYLD_LIBRARY_PATH"] = str(config.BUBBLE_HOME / "lib") + (
+                    f":{env['DYLD_LIBRARY_PATH']}" if env.get("DYLD_LIBRARY_PATH") else "")
+                os.execve(str(target), [str(target), *(args.args or [])], env)
+            except BuildError as exc:
+                term.err(f"  {term.red('✗')} {exc}")
+                return 1
+        elif raw.endswith(".rs") or raw_path.name == "Cargo.toml":
+            from .run.builder import build_rust_cargo, BuildError
+            import shutil
+            import subprocess
+            manifest = raw_path if raw_path.name == "Cargo.toml" else raw_path.parent / "Cargo.toml"
+            if not manifest.exists() and raw.endswith(".rs"):
+                rustc = shutil.which("rustc")
+                if not rustc:
+                    term.err(f"  {term.red('✗')} rustc not found")
+                    return 1
+                target = config.WHEELS_DIR / raw_path.stem
+                try:
+                    subprocess.run([rustc, str(raw_path), "-o", str(target)], check=True, capture_output=True)
+                    os.execv(str(target), [str(target), *(args.args or [])])
+                except subprocess.CalledProcessError as exc:
+                    term.err(f"  {term.red('✗')} rustc compilation failed: {exc.stderr.decode('utf-8')}")
+                    return 1
+            else:
+                try:
+                    binaries = build_rust_cargo(manifest, config.WHEELS_DIR)
+                    if not binaries:
+                        term.err(f"  {term.red('✗')} no binaries compiled")
+                        return 1
+                    target = binaries[0]
+                    os.execv(str(target), [str(target), *(args.args or [])])
+                except BuildError as exc:
+                    term.err(f"  {term.red('✗')} {exc}")
+                    return 1
+        elif raw.endswith(".sh") and not os.access(str(raw_path), os.X_OK):
+            import shutil
+            bash_bin = shutil.which("bash") or "/bin/sh"
+            os.execv(bash_bin, [bash_bin, str(raw_path), *(args.args or [])])
+            return 1
+
     # Non-Python dispatch: explicit file path or bare keep name.
     if not raw.endswith(".py"):
         target = None

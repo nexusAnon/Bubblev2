@@ -64,10 +64,19 @@ def ingest(
 
     # 1. Scan
     merged, scan_errors = scan_dir(project_dir)
+
+    # Universal Polyglot Ingestion Scanning
+    from .scanner.universal import scan_project
+    pset = scan_project(project_dir)
+
     if verbose:
         import sys
         print(f"  scanned {sum(1 for _ in project_dir.rglob('*.py'))} .py files, "
               f"{len(merged.top_level_imports)} external imports", file=sys.stderr)
+        if pset.is_polyglot():
+            print(f"  detected polyglot assets: c/cpp={len(pset.c_cpp_files)}, "
+                  f"rust={len(pset.rust_manifests)}, bash={len(pset.bash_scripts)}, "
+                  f"binaries={len(pset.binaries)}", file=sys.stderr)
 
     # 2. Resolve
     plan = resolve(merged)
@@ -84,6 +93,59 @@ def ingest(
 
     # 4. Create or update shell
     sd = shell_mod.create(shell_name, [], exist_ok=overwrite, parent=parent)
+    shell_bin = sd / "bin"
+    shell_bin.mkdir(parents=True, exist_ok=True)
+
+    # Compile and import C/C++ files
+    for c_file in pset.c_cpp_files:
+        if c_file.suffix.lower() in (".c", ".cpp", ".cc"):
+            from .run.builder import build_c_cpp
+            try:
+                build_c_cpp(c_file, shell_bin / c_file.stem)
+            except Exception as exc:
+                scan_errors.append((c_file, f"Polyglot compilation error: {exc}"))
+
+    # Compile and import Rust manifests (Cargo)
+    for cargo_toml in pset.rust_manifests:
+        from .run.builder import build_rust_cargo
+        try:
+            build_rust_cargo(cargo_toml, shell_bin)
+        except Exception as exc:
+            scan_errors.append((cargo_toml, f"Polyglot Cargo build error: {exc}"))
+
+    # Symlink and permission Bash scripts
+    for sh_script in pset.bash_scripts:
+        dest = shell_bin / sh_script.name
+        try:
+            if dest.exists() or dest.is_symlink():
+                dest.unlink()
+            rel_target = os.path.relpath(sh_script, start=dest.parent)
+            os.symlink(rel_target, dest)
+            # Make sure it's executable
+            sh_script.chmod(sh_script.stat().st_mode | 0o111)
+        except Exception as exc:
+            scan_errors.append((sh_script, f"Bash linking error: {exc}"))
+
+    # Copy/Symlink and Isolate Binary Executables
+    for binary in pset.binaries:
+        dest = shell_bin / binary.name
+        import shutil
+        try:
+            shutil.copy2(binary, dest)
+            dest.chmod(dest.stat().st_mode | 0o111)
+            # Link-patch for user-space hermeticity
+            from .tools.elf import patch_elf_binary
+            from .tools.macho import patch_macho_binary
+            try:
+                patch_elf_binary(dest)
+            except Exception:
+                pass
+            try:
+                patch_macho_binary(dest)
+            except Exception:
+                pass
+        except Exception as exc:
+            scan_errors.append((binary, f"Binary import error: {exc}"))
 
     # Build pinned specs from the resolved plan and add them.
     specs = [
