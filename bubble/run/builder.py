@@ -42,11 +42,11 @@ def build_c_cpp(file_path: Path, output_path: Path) -> Path:
 
     # Patch the compiled binary RPATH/Interpreter to maintain user-space hermeticity
     try:
-        patch_elf_binary(output_path)
+        patch_elf_binary(output_path, rpath="$ORIGIN/../lib")
     except Exception:
         pass
     try:
-        patch_macho_binary(output_path)
+        patch_macho_binary(output_path, rpath_changes=[("@loader_path/../lib", "@loader_path/../lib")])
     except Exception:
         pass
 
@@ -80,11 +80,11 @@ def build_rust_cargo(manifest_path: Path, output_dir: Path) -> list[Path]:
                 shutil.copy2(item, dest)
                 # Patch for hermeticity
                 try:
-                    patch_elf_binary(dest)
+                    patch_elf_binary(dest, rpath="$ORIGIN/../lib")
                 except Exception:
                     pass
                 try:
-                    patch_macho_binary(dest)
+                    patch_macho_binary(dest, rpath_changes=[("@loader_path/../lib", "@loader_path/../lib")])
                 except Exception:
                     pass
                 built_binaries.append(dest)

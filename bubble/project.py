@@ -137,11 +137,11 @@ def ingest(
             from .tools.elf import patch_elf_binary
             from .tools.macho import patch_macho_binary
             try:
-                patch_elf_binary(dest)
+                patch_elf_binary(dest, rpath="$ORIGIN/../lib")
             except Exception:
                 pass
             try:
-                patch_macho_binary(dest)
+                patch_macho_binary(dest, rpath_changes=[("@loader_path/../lib", "@loader_path/../lib")])
             except Exception:
                 pass
         except Exception as exc:

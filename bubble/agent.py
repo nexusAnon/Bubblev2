@@ -233,6 +233,153 @@ class AgentVault:
             in self._aliases.items()
         }
 
+    def register_polyglot(
+        self,
+        alias: str,
+        source_path: Path | str,
+        *,
+        overwrite: bool = False,
+    ) -> Path:
+        """Register an arbitrary C, C++, Rust, Bash, or Binary tool for the agent.
+
+        Compiles C/C++ or Rust assets, link-patches them for user-space hermeticity,
+        registers the build in v4 universal metadata database tables, and returns
+        the absolute path to the fully contained binary executable.
+        """
+        self._check_open()
+        source_path = Path(source_path).resolve()
+        from .run import shell as shell_mod
+        from .vault import db
+        from . import config
+
+        # Create a dedicated agent-shell bin directory
+        sd = shell_mod.shell_dir(f"agent-{alias}")
+        if sd.exists() and not overwrite:
+            raise FileExistsError(f"Polyglot tool alias {alias!r} already registered at {sd}")
+        elif sd.exists():
+            import shutil
+            shutil.rmtree(sd)
+
+        sd.mkdir(parents=True)
+        shell_bin = sd / "bin"
+        shell_bin.mkdir(parents=True)
+        (sd / "lib").mkdir()
+
+        # Handle file shapes
+        compiled_executable = None
+        ecosystem = "binary"
+
+        suffix = source_path.suffix.lower()
+        if suffix in (".c", ".cpp", ".cc"):
+            from .run.builder import build_c_cpp
+            compiled_executable = shell_bin / source_path.stem
+            build_c_cpp(source_path, compiled_executable)
+            ecosystem = "c_cpp"
+        elif source_path.name == "Cargo.toml":
+            from .run.builder import build_rust_cargo
+            binaries = build_rust_cargo(source_path, shell_bin)
+            if binaries:
+                compiled_executable = binaries[0]
+            ecosystem = "cargo"
+        elif suffix == ".sh":
+            compiled_executable = shell_bin / source_path.name
+            if compiled_executable.exists() or compiled_executable.is_symlink():
+                compiled_executable.unlink()
+            rel_target = os.path.relpath(source_path, start=compiled_executable.parent)
+            os.symlink(rel_target, compiled_executable)
+            source_path.chmod(source_path.stat().st_mode | 0o111)
+            ecosystem = "bash"
+        else:
+            # Assume pre-compiled binary executable
+            compiled_executable = shell_bin / source_path.name
+            import shutil
+            shutil.copy2(source_path, compiled_executable)
+            compiled_executable.chmod(compiled_executable.stat().st_mode | 0o111)
+            # Patch links
+            from .tools.elf import patch_elf_binary
+            from .tools.macho import patch_macho_binary
+            try:
+                patch_elf_binary(compiled_executable, rpath="$ORIGIN/../lib")
+            except Exception:
+                pass
+            try:
+                patch_macho_binary(compiled_executable, rpath_changes=[("@loader_path/../lib", "@loader_path/../lib")])
+            except Exception:
+                pass
+
+        if not compiled_executable or not compiled_executable.exists():
+            raise RuntimeError(f"Could not build or register polyglot tool at {source_path}")
+
+        # Register in SQLite v4 universal metadata tables
+        conn = db.connect()
+        try:
+            pkg_id = f"agent:{alias}"
+            # Record universal package
+            conn.execute(
+                "INSERT OR REPLACE INTO universal_packages (id, name, version, ecosystem, platform_tag, sha256, vault_path) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (pkg_id, alias, "1.0.0", ecosystem, config.runner_platform_tag(), "sha256-agent-tool", str(sd))
+            )
+            # Record binary
+            conn.execute(
+                "INSERT OR REPLACE INTO universal_binaries (package_id, binary_name, rel_path) "
+                "VALUES (?, ?, ?)",
+                (pkg_id, compiled_executable.name, str(compiled_executable.relative_to(sd)))
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        # Cache in aliases map for record
+        self._aliases[alias] = (alias, "1.0.0", "universal", f"agent-polyglot:{ecosystem}")
+        return compiled_executable
+
+    def exec_polyglot(self, alias: str, args: list[str]) -> subprocess.CompletedProcess:
+        """Execute a registered polyglot tool inside its isolated user-space shell.
+
+        Prepopulates paths (PYTHONPATH, PATH, LD_LIBRARY_PATH, DYLD_LIBRARY_PATH, PKG_CONFIG_PATH),
+        guaranteeing safe and hermetic binary execution, capturing and returning the completed process.
+        """
+        self._check_open()
+        from .run import shell as shell_mod
+        sd = shell_mod.shell_dir(f"agent-{alias}")
+        if not sd.exists():
+            raise LookupError(f"Polyglot tool alias {alias!r} not registered; call register_polyglot() first")
+
+        # Find registered binary name from universal binaries
+        from .vault import db
+        conn = db.connect()
+        try:
+            row = conn.execute(
+                "SELECT rel_path FROM universal_binaries WHERE package_id=?",
+                (f"agent:{alias}",)
+            ).fetchone()
+        finally:
+            conn.close()
+
+        if not row:
+            raise LookupError(f"No binary registered for polyglot tool alias {alias!r}")
+
+        executable = sd / row[0]
+
+        # Build environment
+        env = os.environ.copy()
+        lib_path = str(sd / "lib")
+        env["PYTHONPATH"] = lib_path + (
+            f":{env['PYTHONPATH']}" if env.get("PYTHONPATH") else "")
+        env["PATH"] = str(sd / "bin") + ":" + env.get("PATH", "")
+        env["LD_LIBRARY_PATH"] = lib_path + (
+            f":{env['LD_LIBRARY_PATH']}" if env.get("LD_LIBRARY_PATH") else "")
+        env["DYLD_LIBRARY_PATH"] = lib_path + (
+            f":{env['DYLD_LIBRARY_PATH']}" if env.get("DYLD_LIBRARY_PATH") else "")
+        env["PKG_CONFIG_PATH"] = f"{lib_path}/pkgconfig:{lib_path}" + (
+            f":{env['PKG_CONFIG_PATH']}" if env.get("PKG_CONFIG_PATH") else "")
+        env["BUBBLE_SHELL"] = f"agent-{alias}"
+        env["BUBBLE_SHELL_DIR"] = str(sd)
+
+        import subprocess
+        return subprocess.run([str(executable)] + args, capture_output=True, env=env)
+
     # ─────────────────────── lifecycle ─────────────────────────────────
 
     def close(self) -> None:

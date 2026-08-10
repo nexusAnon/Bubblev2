@@ -5,7 +5,6 @@ Stage 1 (universal) of the polyglot pipeline: scan_project(project_dir) -> Polyg
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from dataclasses import dataclass, field
 
