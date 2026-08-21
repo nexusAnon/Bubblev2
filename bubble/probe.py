@@ -177,6 +177,18 @@ def probe_runner() -> dict:
     }
 
 
+def probe_universal() -> dict:
+    """Interrogate the machine for non-Python package managers and tools
+    needed for universal repository absorption and linker rewriting."""
+    tools = ["patchelf", "install_name_tool", "npm", "node", "cargo", "go", "make", "gcc", "clang"]
+    out = {}
+    for tool in tools:
+        path = shutil.which(tool)
+        out[f"has_{tool}"] = path is not None
+        out[f"{tool}_path"] = path or ""
+    return out
+
+
 # ─────────────────────────── orchestration ──────────────────────────────
 
 
@@ -190,6 +202,7 @@ PROBES: dict[str, Callable[[], dict]] = {
     "dlmopen":             probe_dlmopen,
     "libpython_embeddable": probe_libpython_embeddable,
     "subinterpreters":     probe_subinterpreters,
+    "universal":           probe_universal,
 }
 
 
@@ -271,7 +284,7 @@ def to_toml(results: dict) -> str:
         "",
     ]
     for section in ("kernel", "libc", "python", "termux_proot", "resources",
-                    "runner", "dlmopen", "libpython_embeddable", "subinterpreters"):
+                    "runner", "dlmopen", "libpython_embeddable", "subinterpreters", "universal"):
         block = results.get(section, {})
         lines.append(f"[{section}]")
         for k, v in block.items():

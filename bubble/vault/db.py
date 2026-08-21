@@ -17,13 +17,56 @@ from typing import Iterable
 from .. import config
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_meta (
     key TEXT PRIMARY KEY,
     value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS universal_packages (
+    id TEXT PRIMARY KEY,               -- e.g. "npm:esbuild:0.18.2:x64-linux" or "cargo:ripgrep:13.0.0"
+    name TEXT NOT NULL,
+    version TEXT NOT NULL,
+    ecosystem TEXT NOT NULL,           -- 'python', 'npm', 'cargo', 'binary', 'system'
+    platform_tag TEXT,                 -- e.g. "manylinux2014_x86_64"
+    sha256 TEXT NOT NULL,              -- Cryptographic hash over the entire package folder
+    vault_path TEXT NOT NULL           -- RelPath within ~/.bubble/vault/
+);
+
+CREATE TABLE IF NOT EXISTS universal_files (
+    sha256 TEXT PRIMARY KEY,           -- Hash of file content bytes
+    size INTEGER NOT NULL,
+    mtime_ns INTEGER NOT NULL,
+    is_executable INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS universal_package_files (
+    package_id TEXT,
+    rel_path TEXT NOT NULL,
+    file_sha256 TEXT,
+    FOREIGN KEY (package_id) REFERENCES universal_packages(id) ON DELETE CASCADE,
+    FOREIGN KEY (file_sha256) REFERENCES universal_files(sha256) ON DELETE CASCADE,
+    PRIMARY KEY (package_id, rel_path)
+);
+
+CREATE TABLE IF NOT EXISTS universal_dependencies (
+    parent_id TEXT,
+    dependency_id TEXT,
+    is_optional INTEGER DEFAULT 0,
+    FOREIGN KEY (parent_id) REFERENCES universal_packages(id) ON DELETE CASCADE,
+    FOREIGN KEY (dependency_id) REFERENCES universal_packages(id) ON DELETE CASCADE,
+    PRIMARY KEY (parent_id, dependency_id)
+);
+
+CREATE TABLE IF NOT EXISTS universal_binaries (
+    package_id TEXT,
+    binary_name TEXT NOT NULL,         -- e.g., "rg" or "node"
+    rel_path TEXT NOT NULL,            -- path inside the package folder
+    FOREIGN KEY (package_id) REFERENCES universal_packages(id) ON DELETE CASCADE,
+    PRIMARY KEY (package_id, binary_name)
 );
 
 CREATE TABLE IF NOT EXISTS packages (
@@ -149,7 +192,9 @@ CREATE INDEX IF NOT EXISTS idx_vault_files_sha256  ON vault_files(sha256);
 
 def _drop_old_schema(conn: sqlite3.Connection) -> None:
     for tbl in ("vault_files", "top_level", "module_imports", "modules",
-                "dependencies", "bubbles", "shells", "packages", "schema_meta"):
+                "dependencies", "bubbles", "shells", "packages", "schema_meta",
+                "universal_packages", "universal_files", "universal_package_files",
+                "universal_dependencies", "universal_binaries"):
         conn.execute(f"DROP TABLE IF EXISTS {tbl}")
 
 
